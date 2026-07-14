@@ -1,0 +1,33 @@
+! Catalyst 2950-24, IOS 12.1(22)EA2
+! Hostname: 2950-CORE
+!
+hostname 2950-CORE
+!
+vlan 10
+ name DATA
+!
+vlan 20
+ name VOICE
+!
+vlan 30
+ name BRANCH
+!
+interface FastEthernet0/1
+ switchport mode access
+ switchport access vlan 10
+!
+interface FastEthernet0/2
+ switchport mode access
+ switchport access vlan 20
+!
+interface FastEthernet0/23
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20,30
+ description Trunk to TP-Link SG105E (port 5)
+!
+interface FastEthernet0/24
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20,30
+ description Trunk to GNS3 Cloud node (USB NIC bridge)
+!
+end
