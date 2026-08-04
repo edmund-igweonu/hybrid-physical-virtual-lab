@@ -134,6 +134,8 @@ To go beyond an all-virtual build, the inside and outside legs were swapped from
 - Outside leg: USB-to-Ethernet adapter (enx00e04c450b08) to a TP-Link SG105E to a GNS3 Cloud node to firewall eth1
 - DMZ stayed virtual
 
+![GNS3 hybrid topology, firewall bridged to physical switches via Cloud nodes on the inside and outside legs, DMZ still virtual](screenshots/06-hybrid-topology-gns3.png)
+
 A MacBook, connected to the 2950 and assigned 10.10.10.20/24, served as the physical inside test host. The result: a real machine on real switch hardware, through a real cable, into a virtualized firewall enforcing NAT and access control, out to a virtualized DMZ service. Full round trip confirmed with a successful curl:
 
 ![Successful curl from the physical MacBook, through the 2950, to the virtual DMZ host](screenshots/05-mac-hybrid-physical-curl.png)
