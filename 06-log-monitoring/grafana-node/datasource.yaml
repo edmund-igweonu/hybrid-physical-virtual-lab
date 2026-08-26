@@ -1,0 +1,17 @@
+# datasource.yaml
+# Use the stock grafana/grafana image as the GNS3 Docker node and mount
+# this file to /etc/grafana/provisioning/datasources/datasource.yaml
+# so Loki shows up as a data source automatically on first boot -
+# no manual click-through in the Grafana UI needed.
+
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    # Replace with loki-node's actual GNS3-assigned IP if hostname
+    # resolution between nodes isn't set up.
+    url: http://loki-node:3100
+    isDefault: true
+    editable: true
