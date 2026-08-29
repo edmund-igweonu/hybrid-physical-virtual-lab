@@ -84,3 +84,27 @@ rsyslog accepts UDP/TCP 514 with no authentication, and Grafana's still on a def
 ## Later
 
 The AD lab's KVM NAT network (192.168.122.0/24) doesn't currently route to this GNS3 network. When that gets picked up it's its own phase: either a routed leg between the two networks, or Windows Event Forwarding pointed at rsyslog-node once reachability exists.
+
+## Phase 2: wiring the hybrid lab's routers into this stack
+
+Once the hybrid lab was rebuilt with proper OSPF and VLANs, the next step was getting frr1 and frr2 sending their syslog into this same Loki/Grafana pipeline instead of just the 2950. The two projects live on the same physical switch, so rather than trying to route between two separate GNS3 setups, I gave the log-monitoring segment its own VLAN (40) and let frr1 act as its gateway.
+
+That part went smoothly once the switch trunk was updated. The bigger issue was the container side.
+
+### The loki-node and grafana-node mixup
+
+Both containers were showing no IPv4 address at all after restarting, just a link-local IPv6 address. Turned out their entrypoint scripts and Dockerfiles had gotten swapped at some point, probably during an earlier session when I was recovering files out of Trash. `loki-node`'s folder actually had Grafana's startup script in it, and grafana-node was missing its entrypoint entirely. Neither container was running what it thought it was.
+
+Traced it back through a handful of numbered duplicate files still sitting in Trash and matched each one to what it actually did (one execs `loki`, the other execs `grafana-server`), then put them back in the right folders and rebuilt both images. Worth remembering for later: when GNS3 or Docker won't pick up a config change, it's not always the config that's wrong.
+
+### Default routes
+
+Even after fixing the containers, frr2 (on a different subnet than the log-monitoring nodes) couldn't reach rsyslog-node, even though frr1 could. rsyslog-node had no default gateway, so replies to anything outside its own subnet had nowhere to go. Added `ip route add default via 10.10.30.1` into its entrypoint script so it persists across restarts, same idea as the static IP assignment already in there.
+
+### Splitting router and switch logs in Loki
+
+Originally everything from `/var/log/remote/*.log` got tagged with a single `job=syslog` label. With the routers now in the mix, split that into `job=router` for frr1/frr2 and `job=switch` for the 2950, based on the source IP in the filename. Makes it possible to filter Grafana dashboards by device type later instead of grepping through everything at once.
+
+### Verifying it actually works
+
+Same approach as phase 1: query Loki's HTTP API directly rather than trust the Grafana Explore UI, since that data-source bug from phase 1 is still unresolved. Flapping an interface on frr2 and querying `{job="router"}` a few seconds later showed the OSPF neighbor renegotiation event, sourced from `10.10.10.2`, tagged correctly. That's frr2's traffic reaching Loki through frr1's routing, not just a direct link, which was the actual point of this phase.
