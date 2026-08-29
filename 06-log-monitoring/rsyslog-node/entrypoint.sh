@@ -16,7 +16,7 @@ for i in $(seq 1 20); do
 done
 ip addr add "$NODE_IP" dev eth0 2>/dev/null || true
 ip link set eth0 up
-
+ip route add default via 10.10.30.1 2>/dev/null || true
 # Clear any stale pidfile left over from a previous run (container
 # restarts can leave /run/rsyslogd.pid behind, causing a fresh
 # rsyslogd launch to fail thinking another instance is active).
