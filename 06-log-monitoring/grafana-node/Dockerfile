@@ -18,10 +18,9 @@ RUN apt-get update && \
 RUN mkdir -p /etc/grafana/provisioning/datasources
 
 COPY datasource.yaml /etc/grafana/provisioning/datasources/datasource.yaml
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 3000/tcp
 
-ENTRYPOINT ["/usr/sbin/grafana-server", \
-            "--homepath=/usr/share/grafana", \
-            "--config=/etc/grafana/grafana.ini", \
-            "cfg:default.paths.provisioning=/etc/grafana/provisioning"]
+ENTRYPOINT ["/entrypoint.sh"]

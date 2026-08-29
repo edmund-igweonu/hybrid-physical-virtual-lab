@@ -1,31 +1,25 @@
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
-
 positions:
   filename: /tmp/positions.yaml
-
-# loki-node's hostname does NOT resolve (no DNS between GNS3 Docker
-# nodes) - this must be the actual assigned IP, kept in sync with
-# loki-node's entrypoint.sh NODE_IP default (10.10.30.242).
 clients:
   - url: http://10.10.30.242:3100/loki/api/v1/push
-
 scrape_configs:
   - job_name: network_devices
     static_configs:
       - targets:
           - localhost
         labels:
-          job: syslog
           __path__: /var/log/remote/*.log
-
     pipeline_stages:
-      # Pull the source hostname out of the filename so it becomes a
-      # Loki label (e.g. host="2950" or host="frr1") instead of just
-      # being buried in the log line.
       - regex:
           source: filename
           expression: '/var/log/remote/(?P<host>[^/]+)\.log'
+      - template:
+          source: host
+          template: '{{ if or (eq . "10.10.10.1") (eq . "10.10.10.2") (eq . "10.10.20.1") (eq . "10.10.20.2") (eq . "10.10.40.1") (eq . "10.10.40.2") (eq . "192.168.100.1") (eq . "192.168.100.2") }}router{{ else }}switch{{ end }}'
+          target: job
       - labels:
           host:
+          job:

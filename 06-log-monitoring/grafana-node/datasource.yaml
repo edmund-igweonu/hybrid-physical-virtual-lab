@@ -10,8 +10,9 @@ datasources:
   - name: Loki
     type: loki
     access: proxy
-    # Replace with loki-node's actual GNS3-assigned IP if hostname
-    # resolution between nodes isn't set up.
-    url: http://loki-node:3100
+    # loki-node's hostname does NOT resolve (no DNS between GNS3
+    # Docker nodes) - must be the actual assigned IP, kept in sync
+    # with loki-node's entrypoint.sh NODE_IP default.
+    url: http://10.10.30.242:3100
     isDefault: true
     editable: true

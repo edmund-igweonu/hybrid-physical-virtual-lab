@@ -2,25 +2,26 @@ FROM ubuntu:24.04
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        apt-transport-https \
-        software-properties-common \
-        wget \
-        gpg \
-        iproute2 \
-        ca-certificates && \
-    wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor > /usr/share/keyrings/grafana.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://apt.grafana.com stable main" \
-        > /etc/apt/sources.list.d/grafana.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends grafana && \
+        curl \
+        unzip \
+        ca-certificates \
+        iproute2 && \
     rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /etc/grafana/provisioning/datasources
+ARG LOKI_VERSION=3.0.0
+RUN curl -sL -o /tmp/loki.zip \
+        "https://github.com/grafana/loki/releases/download/v${LOKI_VERSION}/loki-linux-amd64.zip" && \
+    unzip /tmp/loki.zip -d /usr/local/bin && \
+    mv /usr/local/bin/loki-linux-amd64 /usr/local/bin/loki && \
+    chmod +x /usr/local/bin/loki && \
+    rm /tmp/loki.zip
 
-COPY datasource.yaml /etc/grafana/provisioning/datasources/datasource.yaml
+RUN mkdir -p /loki/chunks /loki/rules /etc/loki
+
+COPY loki-config.yaml /etc/loki/local-config.yaml
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 3000/tcp
+EXPOSE 3100/tcp
 
 ENTRYPOINT ["/entrypoint.sh"]
