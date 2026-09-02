@@ -121,6 +121,63 @@ Screenshots:
 
 Haven't wired this into the Loki/Grafana pipeline from `06-log-monitoring` yet, right now it's just sitting in the flat file on `tacacs-node`. That's still on the list.
 
+## Wiring accounting into Loki
+
+The flat accounting file works, but it's more useful sitting in the same centralized logging pipeline as the router and switch logs from `06-log-monitoring`, so the next step was piping it there.
+
+**The infrastructure problem first.** `tacacs-node` lives in its own GNS3 project (`tacacs-aaa-lab`), separate from the project holding `rsyslog-node`, `loki-node`, and `grafana-node`. Both projects bridge into the physical 2950 through a Cloud node bound to the Acer's onboard NIC, and up to this point they'd only ever been run one at a time, closing one before opening the other. For `tacacs-node` to actually reach `rsyslog-node`, both projects needed to be live at once, so each needed its own physical path into the switch. Wired a second, spare USB-to-Ethernet adapter into a free 2950 port (Fa0/10) on the same VLAN 1 segment, bound the log-monitoring project's Cloud node to that adapter, and confirmed both projects could run side by side with full reachability between `tacacs-node` (10.10.30.244) and `rsyslog-node` (10.10.30.241).
+
+**Getting accounting out via syslog.** `tac_plus` supports sending accounting records straight to syslog instead of (or alongside) the flat file:
+
+```
+logging = local7
+accounting syslog
+```
+
+`tacacs-node`'s minimal image had no syslog daemon at all, so `rsyslog` got added to the Dockerfile along with a forwarding rule (`*.* @10.10.30.241:514`) pointing at `rsyslog-node`, the same UDP port the 2950 and FRR nodes already ship logs to.
+
+First attempt at starting it in the entrypoint used `service rsyslog start`, which failed outright, this container has no real init system (same reason `tac_plus` itself has to run as PID 1 directly instead of through anything service-manager-like), so `service` doesn't work here at all. Swapped it for starting the binary directly, `/usr/sbin/rsyslogd`, which daemonizes on its own and returns immediately.
+
+**Confirming it worked.** Logged into the switch, ran a command, then checked `rsyslog-node`'s log directory and found a new file, `tacacs-node-1.log`, named by hostname rather than IP since that's what came through in the syslog messages. It contained the full accounting trail: the TACACS+ connection, login query accepted, authorization query accepted, the exec session start, the `cmd=show version` record, and the session stop with elapsed time, all forwarded in real time.
+
+**Tagging it in Promtail.** The existing Promtail config on `rsyslog-node` splits incoming logs into `job=router` or `job=switch` based on matching the source IP in the filename. Since `tacacs-node-1.log` is named by hostname instead, neither rule matched it, so a third match block was added:
+
+```yaml
+- match:
+    selector: '{host=~"tacacs-node.*"}'
+    stages:
+      - static_labels:
+          job: tacacs
+```
+
+Restarting Promtail turned out to need restarting the whole `rsyslog-node` container, not just killing the Promtail process, since Promtail is itself the container's foreground/PID 1 process, same pattern as `tac_plus -G` in `tacacs-node`. Killing it directly kills the container.
+
+Confirmed the new label was live by querying Loki's API directly for `{job="tacacs"}` after generating a fresh login, and got back a real log line, `connect from 10.10.30.10`, tagged and queryable exactly as expected.
+
+**Grafana's UI still doesn't show it.** The Loki data source is registered correctly in Grafana's backend (confirmed via `/api/datasources`, present, marked default, right URL), but it doesn't appear in the Explore page's data source picker, and querying through Grafana's own proxy endpoint returns `{"message":"Not found"}`. This is the same unresolved issue from the original `06-log-monitoring` build, not something new. The pipeline itself is proven working end to end via the Loki API directly; only the Grafana UI layer has this gap.
+
+Screenshots:
+
+- `screenshot-tacacs-syslog-forward.png`, the full accounting trail as it lands in `rsyslog-node`'s `tacacs-node-1.log`
+
+  ![tac_plus accounting records forwarded into rsyslog-node's log file](screenshot-tacacs-syslog-forward.png)
+
+- `screenshot-promtail-config.png`, the new `job: tacacs` match block alongside the existing router/switch rules
+
+  ![promtail config showing the new tacacs job label match block](screenshot-promtail-config.png)
+
+- `screenshot-loki-query-tacacs.png`, a direct Loki API query confirming the new label is live and queryable
+
+  ![Loki API query for job=tacacs returning a real log line](screenshot-loki-query-tacacs.png)
+
+- `screenshot-grafana-datasource-gap.png`, Explore's data source picker not listing Loki despite it being registered
+
+  ![Grafana Explore data source picker missing Loki](screenshot-grafana-datasource-gap.png)
+
+- `screenshot-grafana-proxy-404.png`, the same gap from the other side, Grafana's own proxy endpoint returning not found
+
+  ![Grafana proxy endpoint for Loki returning a 404](screenshot-grafana-proxy-404.png)
+
 ## Current state
 
 - `tacacs-node` built, running, and reachable from the 2950
@@ -128,9 +185,11 @@ Haven't wired this into the Loki/Grafana pipeline from `06-log-monitoring` yet, 
 - Two privilege levels demonstrated and enforced, including at the `enable` boundary
 - A real local fallback account now exists on the switch
 - Accounting on, both session-level and per-command, confirmed in `tac_plus.acct`
+- Accounting forwarded via syslog into the existing Loki pipeline, confirmed working at the API level; Grafana's UI has a known, pre-existing gap showing the Loki data source
 
 ## Next steps
 
 - `aaa authorization commands`, to restrict which specific commands each privilege level can run, not just the starting prompt
-- Wire accounting output into the syslog/Loki pipeline from `06-log-monitoring` instead of just reading the flat file
+- Track down why Grafana's Explore picker and proxy endpoint can't see the Loki data source despite it being correctly registered, a gap that predates this lab and also affected `06-log-monitoring`
+- Bake the Promtail config change and the second Cloud node's physical wiring into something that survives a container recreate, right now the `job: tacacs` match block only lives in the running container, not the image
 - Optionally, extend `tac_plus.conf` with a `$enab15$` user block so `enable` can be authorized through TACACS+ directly instead of relying only on the local secret
