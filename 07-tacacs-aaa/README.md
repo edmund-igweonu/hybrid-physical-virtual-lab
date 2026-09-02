@@ -81,15 +81,56 @@ Screenshots:
 
   ![viewer being challenged and denied at the enable prompt](screenshot-viewer-enable-denied.png)
 
+## Accounting
+
+Once the privilege split was proven, added accounting so there's an actual record of who did what, not just who's allowed to do what.
+
+```
+aaa accounting exec default start-stop group tacacs+
+aaa accounting commands 15 default start-stop group tacacs+
+aaa accounting commands 1 default start-stop group tacacs+
+```
+
+Two kinds of records show up in `tac_plus.acct` once this is on. Command accounting logs each command as it runs, tagged with the username, source IP, and privilege level it ran at:
+
+```
+Sep 2 13:10:45 10.10.30.10 admin tty0 async stop task_id=3 ... priv-lvl=1 cmd=show version <cr>
+Sep 2 13:10:51 10.10.30.10 admin tty0 async stop task_id=4 ... priv-lvl=1 cmd=show vlan brief <cr>
+```
+
+One thing that looked off at first but isn't: those two commands show `priv-lvl=1` even though they were run from an `admin` session at `Switch#`. That's normal, IOS treats basic `show` commands as privilege-level-1 commands by default regardless of who's running them, so they land under the `commands 1` accounting list. Commands like `write` or anything in config mode show up as `priv-lvl=15` instead. It's actually a good sign, it means the logging is tracking the command's real level, not just copying whatever level the session happens to be at.
+
+Exec accounting logs the session itself, separate from any individual command:
+
+```
+Sep 2 13:14:49 10.10.30.10 admin tty0 async start task_id=5 ... service=shell
+Sep 2 13:15:46 10.10.30.10 admin tty0 async stop task_id=5 ... elapsed_time=57
+```
+
+Same `task_id` on both lines ties the start and stop together, so this pair says: admin logged in at 13:14:49, logged out at 13:15:46, session lasted 57 seconds.
+
+Screenshots:
+
+- `screenshot-accounting-commands.png`, per-command accounting entries in `tac_plus.acct`
+
+  ![per-command accounting entries showing username, privilege level, and command](screenshot-accounting-commands.png)
+
+- `screenshot-accounting-exec.png`, the paired start/stop session record
+
+  ![paired start and stop exec accounting records with elapsed time](screenshot-accounting-exec.png)
+
+Haven't wired this into the Loki/Grafana pipeline from `06-log-monitoring` yet, right now it's just sitting in the flat file on `tacacs-node`. That's still on the list.
+
 ## Current state
 
 - `tacacs-node` built, running, and reachable from the 2950
 - Authentication and authorization both working and confirmed with debug output
 - Two privilege levels demonstrated and enforced, including at the `enable` boundary
 - A real local fallback account now exists on the switch
+- Accounting on, both session-level and per-command, confirmed in `tac_plus.acct`
 
 ## Next steps
 
 - `aaa authorization commands`, to restrict which specific commands each privilege level can run, not just the starting prompt
-- `aaa accounting`, to log command usage per user, and feed that into the syslog/Loki pipeline from `06-log-monitoring`
+- Wire accounting output into the syslog/Loki pipeline from `06-log-monitoring` instead of just reading the flat file
 - Optionally, extend `tac_plus.conf` with a `$enab15$` user block so `enable` can be authorized through TACACS+ directly instead of relying only on the local secret
