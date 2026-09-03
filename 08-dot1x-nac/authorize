@@ -1,0 +1,6 @@
+alice   Cleartext-Password := "<password>"
+        Tunnel-Type = VLAN,
+        Tunnel-Medium-Type = IEEE-802,
+        Tunnel-Private-Group-Id = "10"
+
+bob     Cleartext-Password := "<password>"
