@@ -197,11 +197,16 @@ Bringing the sham-link up made the MPLS path eligible to compete with the backdo
 The fix was to raise the backdoor's OSPF cost above the full end-to-end cost of the MPLS path:
 
 ```
-interface <backdoor-facing interface>
+! CE-A-Site1
+interface FastEthernet1/0
+ ip ospf cost 100
+!
+! CE-A-Site2
+interface FastEthernet0/0
  ip ospf cost 100
 ```
 
-applied on both CE-A-Site1 and CE-A-Site2. With that in place, the path shifted to the intended route:
+applied on CE-A-Site1's backdoor interface (FastEthernet1/0) and CE-A-Site2's backdoor interface (FastEthernet0/0) — the two ends of the same physical link happen to land on different interface numbers since each CE has a different number of other interfaces already in use. With that in place, the path shifted to the intended route:
 
 ![Fixed path via MPLS core, labels visible](screenshots/fixed-mpls-traceroute.png)
 
