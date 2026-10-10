@@ -140,9 +140,9 @@ The new root port cost of 38 is the path through SW1 (19 + 19), compared to 19 o
 
 VLAN 20 played out completely differently from the same link failure. SW3 is root for VLAN 20, so Fa1/1 just went down and SW3 had nothing to recalculate. The topology change it received later came from SW2, which lost its direct path to SW3 and had to reconverge on its own side.
 
-![After failover](05-failover-after.png)
-
 After the dust settled, Fa1/0 was SW3's root port for VLAN 10. Bringing Fa1/1 back up reversed everything.
+
+![After failover](05-failover-after.png)
 
 Thirty seconds is a long time for a voice call. Rapid PVST+ gets this down to around a second using proposal and agreement handshakes instead of timers, which is why nobody runs classic 802.1D anymore. I didn't test Rapid PVST+ here.
 
