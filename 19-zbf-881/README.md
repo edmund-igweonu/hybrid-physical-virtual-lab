@@ -108,7 +108,11 @@ Before any zones were applied, every host could reach every other host. This con
 
 ![Baseline tests from the Mac](screenshots/01-baseline-mac.png)
 
-![Baseline tests from R2](screenshots/02-baseline-r2.png)
+![Baseline: R2 ping to inside](screenshots/02-baseline-r2-ping-inside.png)
+
+![Baseline: R2 ping to DMZ](screenshots/02-baseline-r2-ping-dmz.png)
+
+![Baseline: R2 telnet to DMZ port 80](screenshots/02-baseline-r2-telnet-dmz.png)
 
 ## Zones and zone pairs
 
@@ -191,7 +195,9 @@ The blocked tests that have no zone pair at all (outside to inside, DMZ to insid
 │   └── 881-R2-zbf.cfg
 └── screenshots/
     ├── 01-baseline-mac.png
-    ├── 02-baseline-r2.png
+    ├── 02-baseline-r2-ping-inside.png
+    ├── 02-baseline-r2-ping-dmz.png
+    ├── 02-baseline-r2-telnet-dmz.png
     ├── 03-zone-security.png
     ├── 04-zone-pair-security.png
     ├── 05-match-all-bug-log.png
