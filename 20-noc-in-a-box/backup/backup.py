@@ -2,7 +2,8 @@
 """Lab 20 (NOC in a Box) config backup.
 
 Pulls the running-config from every device in the lab and saves each one to
-backups/<timestamp>/<device>.cfg.
+backups/<UTC timestamp>/<device>.cfg, so folder names line up with the
+device logs.
 
 Physical devices (881-R1, 881-R2, 2950) log in with the TACACS+ account from .env.
 Carrier routers (R2, R3, R4) are Dynamips nodes reached through their GNS3 console
@@ -13,7 +14,7 @@ Exit code is 0 if every device was backed up, 1 otherwise, so it can run from cr
 
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -64,9 +65,11 @@ def carrier_devices():
         return []
 
     devices = []
+    found = set()
     for node in gns3_get(f"/projects/{project['project_id']}/nodes"):
         if node["name"] not in CARRIER_NODES:
             continue
+        found.add(node["name"])
         if node["status"] != "started":
             print(f"SKIP  {node['name']}: node is {node['status']}")
             continue
@@ -81,6 +84,9 @@ def carrier_devices():
                 "password": "",
             }
         )
+    for name in CARRIER_NODES:
+        if name not in found:
+            print(f"SKIP  {name}: no node with that name in the GNS3 project")
     return devices
 
 
@@ -117,7 +123,7 @@ def main():
     if not LAB_USER or not LAB_PASS:
         sys.exit("Set LAB_USER and LAB_PASS in .env first")
 
-    outdir = Path(__file__).parent / "backups" / datetime.now().strftime("%Y-%m-%d_%H%M")
+    outdir = Path(__file__).parent / "backups" / datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%MZ")
     outdir.mkdir(parents=True, exist_ok=True)
 
     devices = PHYSICAL_DEVICES + carrier_devices()

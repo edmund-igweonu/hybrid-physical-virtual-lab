@@ -1,6 +1,6 @@
 # Lab 20 incident tickets
 
-All times are UTC, to match the device logs. Backup folder names are in the Acer's local time (NST, UTC-3:30), because that's how backup.py names them. Grafana screenshots also show NST, since that's what my browser uses.
+All times are UTC, to match the device logs. The backup folder names in these tickets are in the Acer's local time (NST, UTC-3:30), because that's how backup.py named them at the time. It names them in UTC now. Grafana screenshots also show NST, since that's what my browser uses.
 
 ## Found during the build (INC-01 to INC-04)
 
@@ -104,8 +104,10 @@ Timeline
 Impact: branch lost access to HQ services and 881-R2 was out of management
 except by console.
 
-Time to detect: about 15 sec, the EIGRP hold time. Total outage: about 22
-min, most of it the VPN not recovering after the carrier was fixed.
+Time to detect: not measured, since I didn't note when I shut the link. The
+EIGRP hold time on Tunnel0 is 15 sec, so the neighbor drop at 15:13:37 was at
+most about 15 sec after the fault. Total outage: about 22 min from detection,
+most of it the VPN not recovering after the carrier was fixed.
 
 Root cause: carrier core link R3 Fa0/1 down. The slow recovery was a stale
 IPsec session on the branch, since DPD wasn't configured.

@@ -17,3 +17,29 @@ scrape_configs:
           job: wan-probe
           host: acer
           __path__: /var/log/wan-probe/*.log
+  - job_name: network-devices
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: switch
+          host: 2950
+          __path__: /var/log/remote/10.10.30.10.log
+      - targets:
+          - localhost
+        labels:
+          job: router
+          host: 881-R1
+          __path__: /var/log/remote/10.10.30.1.log
+      - targets:
+          - localhost
+        labels:
+          job: router
+          host: 881-R2
+          __path__: /var/log/remote/10.20.50.1.log
+      - targets:
+          - localhost
+        labels:
+          job: tacacs
+          host: tacacs-node
+          __path__: /var/log/remote/10.10.30.244.log

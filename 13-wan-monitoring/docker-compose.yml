@@ -27,6 +27,7 @@ services:
     volumes:
       - ./promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
       - ./logs:/var/log/wan-probe:ro
+      - /var/log/remote:/var/log/remote:ro
     depends_on:
       - loki
     restart: unless-stopped

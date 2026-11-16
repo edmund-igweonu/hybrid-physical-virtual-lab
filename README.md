@@ -26,12 +26,15 @@ This is my main hands-on networking lab, where I mix real hardware (two Cisco 88
 | `09-ebgp-multias/` | A three-AS eBGP triangle on FRR, with a LOCAL_PREF policy that flips the best path, checked by traceroute and a BGP UPDATE capture. |
 | `10-vrrp-fhrp/` | VRRP on FRR QEMU nodes. Master/Backup election works; the failover demo is listed as a known gap. |
 | `11-redistribution/` | EIGRP, OSPF and BGP redistribution across a five-router Cisco c2691 chain, with the two redistribution gotchas I hit. |
-| `12-hsrp-fhrp/` | HSRP on virtual Cisco c2691 routers. |
+| `12-ipv6-ospfv3/` | Adds IPv6 dual-stack to the lab 11 OSPF core, with OSPFv3 running alongside OSPFv2 on R2, R3 and R4. |
 | `13-wan-monitoring/` | Synthetic WAN monitoring of my home internet path, with latency and loss graphed in Loki and Grafana. |
 | `14-mpls-l3vpn/` | MPLS L3VPN on c2691s: P and PE core, two customers in separate VRFs with overlapping subnets to prove isolation. |
 | `15-stp-pvst/` | PVST+ on c2691 EtherSwitch modules: root election, per-VLAN root split, blocking, failover timing and BPDU capture. |
 | `16-hsrp-physical/` | **First lab on the physical 881s.** HSRP with interface tracking and a real cable-pull failover, measured from a client pinging the virtual gateway. |
 | `17-ip-sla-tracking/` | Extends lab 16 with IP SLA, so the Active router steps down when its upstream stops answering even though its link stays up. |
+| `18-dmvpn-hub-spoke/` | DMVPN hub and spoke on the physical 881s: mGRE, NHRP, EIGRP over the tunnel and IKEv2/IPsec, with before and after packet captures. |
+| `19-zbf-881/` | Zone-based firewall on an 881 with INSIDE, DMZ and OUTSIDE zones, default-deny between zones and live session and counter checks. |
+| `20-noc-in-a-box/` | **Capstone.** Two physical 881 sites over a GNS3 MPLS L3VPN carrier with DMVPN on top, run like a small NOC: syslog, TACACS+, a Grafana/Loki dashboard, Netmiko backups and eight worked incident tickets. |
 
 ## Why hybrid
 

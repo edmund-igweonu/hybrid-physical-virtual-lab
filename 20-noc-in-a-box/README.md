@@ -57,9 +57,9 @@ On R2, Fa0/0 faces HQ and Fa0/1 is the core link to R3. R4 is the other way roun
 
 - `README.md` this file
 - `INCIDENTS.md` the incident tickets, INC-01 to INC-08
-- `noc-dashboard.json` the Grafana dashboard export
+- `noc-dashboard.json` the Grafana dashboard export (import it in Grafana under Dashboards, New, Import)
 - `screenshots/` evidence for this README and the incident tickets
-- `backup/` the Netmiko backup script and its requirements. The `.env` file and the `backups/` output folder are gitignored.
+- `backup/` the Netmiko backup script and its requirements. Copy `.env.example` to `.env` and fill it in. The `.env` file and the `backups/` output folder are gitignored.
 
 ## How it's built
 
@@ -103,7 +103,7 @@ Getting accounting logs out of the container took some work. The container forwa
 
 ### Monitoring
 
-The Grafana and Loki stack from lab 13 got reused. Promtail reads the per-device files in `/var/log/remote/` and labels them by job (`router`, `switch`, `tacacs`) and host. Those Promtail and Compose changes live in the lab 13 folder, but they belong to this lab.
+The Grafana and Loki stack from lab 13 got reused. Promtail reads the per-device files in `/var/log/remote/` and labels them by job (`router`, `switch`, `tacacs`) and host. The stack still runs from the lab 13 folder, so the changes for this lab are there: the `network-devices` job in [`13-wan-monitoring/promtail/promtail-config.yaml`](../13-wan-monitoring/promtail/promtail-config.yaml) and the `/var/log/remote` mount in [`13-wan-monitoring/docker-compose.yml`](../13-wan-monitoring/docker-compose.yml).
 
 Each 881 runs an EEM applet that logs "NOC heartbeat" every 5 minutes. The dashboard has a heartbeat tile per router that goes red if nothing has come in for 15 minutes. The 2950's IOS is too old for EEM, so it doesn't get one.
 
@@ -121,7 +121,7 @@ Grafana shows times in my local time (NST, UTC-3:30) and the routers log in UTC,
 
 ### Backups
 
-`backup/backup.py` uses Netmiko to pull the running config from all six devices into a timestamped folder. The 881s are reached over SSH, the branch one through the tunnel. The 2950 is reached over Telnet because its IOS is too old for SSH, and the three carrier routers through their GNS3 console ports, which the script looks up through the GNS3 API. It logs in as the TACACS+ admin account, so backups show up in accounting too. It only exits 0 if all six succeed.
+`backup/backup.py` uses Netmiko to pull the running config from all six devices into a folder named with the UTC time of the run. The 881s are reached over SSH, the branch one through the tunnel. The 2950 is reached over Telnet because its IOS is too old for SSH, and the three carrier routers through their GNS3 console ports, which the script looks up through the GNS3 API. It logs in as the TACACS+ admin account, so backups show up in accounting too. It only exits 0 if all six succeed.
 
 ![backup.py pulling all six configs](screenshots/backup-run.png)
 
@@ -140,7 +140,7 @@ Full tickets are in [INCIDENTS.md](INCIDENTS.md). INC-01 to INC-04 came up on th
 | INC-03 | Local login rejected while TACACS+ was up | Real | |
 | INC-04 | TACACS+ server down, accounting gap | Real | |
 | INC-05 | Branch WAN cable pulled | Staged | 1 min 45 sec |
-| INC-06 | Carrier core link down | Staged | about 15 sec |
+| INC-06 | Carrier core link down | Staged | not measured (at most about 15 sec) |
 | INC-07 | VPN down after a PSK change | Staged | 26 sec |
 | INC-08 | Branch logs silently dropped by an ACL | Staged | about 14 min |
 
