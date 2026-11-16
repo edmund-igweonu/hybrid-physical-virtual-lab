@@ -35,6 +35,7 @@ This is my main hands-on networking lab, where I mix real hardware (two Cisco 88
 | `18-dmvpn-hub-spoke/` | DMVPN hub and spoke on the physical 881s: mGRE, NHRP, EIGRP over the tunnel and IKEv2/IPsec, with before and after packet captures. |
 | `19-zbf-881/` | Zone-based firewall on an 881 with INSIDE, DMZ and OUTSIDE zones, default-deny between zones and live session and counter checks. |
 | `20-noc-in-a-box/` | **Capstone.** Two physical 881 sites over a GNS3 MPLS L3VPN carrier with DMVPN on top, run like a small NOC: syslog, TACACS+, a Grafana/Loki dashboard, Netmiko backups and eight worked incident tickets. |
+| `21-pihole-dns/` | Pi-hole in Docker on the Acer as DNS for my Mac and iPhone over Tailscale, so ad and tracker blocking works away from home, with per-device query logs in Loki and Grafana. |
 
 ## Why hybrid
 

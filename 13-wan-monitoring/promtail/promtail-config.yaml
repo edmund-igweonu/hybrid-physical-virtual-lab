@@ -49,3 +49,12 @@ scrape_configs:
         labels:
           job: pihole
           __path__: /var/log/pihole/pihole.log
+    # Use the time on the log line, not the time Promtail read it, so a
+    # restart or catch-up doesn't pile old lines into one spike
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<ts>\w{3} +\d{1,2} \d{2}:\d{2}:\d{2}) '
+      - timestamp:
+          source: ts
+          format: 'Jan _2 15:04:05'
+          location: America/St_Johns

@@ -1,6 +1,6 @@
 services:
   pihole:
-    image: pihole/pihole:latest
+    image: pihole/pihole:2026.11.0
     container_name: pihole
     network_mode: host
     environment:
@@ -11,7 +11,7 @@ services:
       FTLCONF_webserver_api_password: ${PIHOLE_PW}
       FTLCONF_dns_listeningMode: BIND
       FTLCONF_dns_interface: tailscale0
-      FTLCONF_webserver_port: "8081"
+      FTLCONF_webserver_port: "100.95.125.24:8081"
     volumes:
       - ./etc-pihole:/etc/pihole
       - ./logs:/var/log/pihole

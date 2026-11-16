@@ -45,7 +45,7 @@
           "refId": "A",
           "datasource": { "type": "loki", "uid": "${datasource}" },
           "queryType": "range",
-          "expr": "sum by (client) (count_over_time({job=\"pihole\"} |= \"query[\" | regexp `from (?P<client>\\S+)` [1m]))",
+          "expr": "sum by (client) (count_over_time({job=\"pihole\"} |= \"query[\" != \"from 127.0.0.1\" | regexp `from (?P<client>\\S+)` [1m]))",
           "legendFormat": "{{client}}"
         }
       ]
@@ -113,7 +113,7 @@
           "refId": "A",
           "datasource": { "type": "loki", "uid": "${datasource}" },
           "queryType": "range",
-          "expr": "sum(count_over_time({job=\"pihole\"} |= \"gravity blocked\" [5m])) / sum(count_over_time({job=\"pihole\"} |= \"query[\" [5m])) * 100",
+          "expr": "sum(count_over_time({job=\"pihole\"} |= \"gravity blocked\" [5m])) / sum(count_over_time({job=\"pihole\"} |= \"query[\" != \"from 127.0.0.1\" [5m])) * 100",
           "legendFormat": "block rate"
         }
       ]
@@ -138,7 +138,7 @@
         "showUnfilled": true,
         "valueMode": "color",
         "namePlacement": "left",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }
       },
       "targets": [
         {
