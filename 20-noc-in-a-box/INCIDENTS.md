@@ -311,3 +311,62 @@ Lessons
 Screenshots
 
 ![Dashboard just after the fix (last hour, NST). Both heartbeats green, no EIGRP neighbor changes, and the only interface events and the one critical event are FE0 and Vlan1 coming back up at 08:47 NST. Nothing on the dashboard ever showed the outage](screenshots/inc09-dashboard.png)
+
+## INC-10 Branch LAN unreachable, rerun with reachability monitoring
+
+Trigger: unplugged the SG105E at the branch again, the same fault as INC-09.
+This time 881-R1 has an IP SLA probe to 10.20.50.1 and a Grafana alert on it
+(the setup is in the README under Monitoring).
+
+Timeline
+- 12:48:21  SG105E unplugged. 881-R2 logs FE0 and Vlan1 down. Unlike INC-09
+  there is a down message, because FE0 was up before the cable came out
+- 12:49:08  881-R1 track 10 goes Up -> Down and the BRANCH-LAN-DOWN applet
+  logs "NOC: branch LAN 10.20.50.1 unreachable from HQ" at severity 3. It
+  shows in the Critical events panel
+- Grafana alert rule in the NOC folder goes to Firing on its next 1 minute
+  evaluation
+- 881-R1: show track 10 is Down with both applets attached, show ip sla
+  statistics 10 shows Timeout on every probe since the unplug
+- plugged the SG105E back in
+- 12:52:34  881-R2 FE0 up
+- 12:53:06  Vlan1 up, 32 sec after FE0. Same gap as INC-09 (12:17:02 to
+  12:17:34). Most likely spanning tree on the built-in switch port, listening
+  then learning at 15 sec each, before it forwards
+- 12:53:23  track 10 Down -> Up, BRANCH-LAN-UP logs "NOC: branch LAN
+  10.20.50.1 reachable again"
+- 12:54  backup.py 6 of 6 (folder 2026-11-16_1254Z), which also captures the
+  new IP SLA, track and EEM config on 881-R1
+
+Impact: branch LAN unreachable from HQ for 4 min 44 sec (Vlan1 down at
+12:48:22, up at 12:53:06). Staged, no users affected.
+
+Time to detect: 47 sec to the severity 3 log line, and the Grafana alert on
+the next evaluation after that. That lines up with the config: up to 10 sec
+until the next probe, a 5 sec timeout, then the 30 sec down delay on the
+track. INC-09 took about 1 h 16 min for the same fault.
+
+Recovery to all clear: 17 sec after Vlan1 came up (next probe plus the 10 sec
+up delay).
+
+Root cause: SG105E unplugged, staged.
+
+Follow-up
+- the alert counts down messages in the last 5 min, so it clears after 5 min
+  even if the branch is still down. Good enough to get someone looking, but a
+  state based check would be better
+- export the alert rule from Grafana into this folder next to
+  noc-dashboard.json, since the dashboard export doesn't include it
+
+Lessons
+- the fix for INC-09 wasn't more logging, it was testing the path the users
+  actually need. The heartbeat stayed green in both runs
+- the detection time can be worked out from the config before the test, then
+  the test proves it. 30 sec down delay plus one probe interval plus the
+  timeout came out at 47 sec
+
+Screenshots
+
+![Critical events panel: FE0 down on 881-R2, BRANCH-LAN-DOWN from 881-R1, then FE0 up and BRANCH-LAN-UP (times in NST)](screenshots/inc10-critical-events.png)
+
+![Grafana alert rules with the NOC rule firing](screenshots/inc10-alert-firing.png)
