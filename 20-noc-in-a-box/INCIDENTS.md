@@ -181,8 +181,15 @@ Lessons
 
 ## INC-08 Branch logs go silent
 
-Trigger: applied an inbound ACL on 881-R1 Tunnel0 as admin. Accounting puts it
-at 13:08:31. I ran date -u at 13:07:05 before typing it, so the accounting time
+Trigger: applied an inbound ACL on 881-R1 Tunnel0 as admin:
+       ```
+       ip access-list extended BRANCH-FILTER
+        deny udp host 10.20.50.1 host 10.10.30.250 eq 514
+        permit ip any any
+       interface Tunnel0
+        ip access-group BRANCH-FILTER in
+       ```
+ Accounting puts it at 13:08:31. I ran date -u at 13:07:05 before typing it, so the accounting time
 is the real one.
 
 Timeline
