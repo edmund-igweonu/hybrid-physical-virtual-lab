@@ -56,7 +56,7 @@ On R2, Fa0/0 faces HQ and Fa0/1 is the core link to R3. R4 is the other way roun
 ## What's in this folder
 
 - `README.md` this file
-- `INCIDENTS.md` the incident tickets, INC-01 to INC-08
+- `INCIDENTS.md` the incident tickets, INC-01 to INC-09
 - `noc-dashboard.json` the Grafana dashboard export (import it in Grafana under Dashboards, New, Import)
 - `screenshots/` evidence for this README and the incident tickets
 - `backup/` the Netmiko backup script and its requirements. Copy `.env.example` to `.env` and fill it in. The `.env` file and the `backups/` output folder are gitignored.
@@ -131,7 +131,7 @@ The 881s only offer SHA-1 key exchange, which current OpenSSH and paramiko refus
 
 ## Incidents
 
-Full tickets are in [INCIDENTS.md](INCIDENTS.md). INC-01 to INC-04 came up on their own during the build. INC-05 to INC-08 were staged and worked from the dashboard as if I didn't know what I'd broken.
+Full tickets are in [INCIDENTS.md](INCIDENTS.md). INC-01 to INC-04 came up on their own during the build. INC-05 to INC-08 were staged and worked from the dashboard as if I didn't know what I'd broken. INC-09 was real and happened after the lab was finished.
 
 | ID | What happened | Type | Time to detect |
 |---|---|---|---|
@@ -143,8 +143,9 @@ Full tickets are in [INCIDENTS.md](INCIDENTS.md). INC-01 to INC-04 came up on th
 | INC-06 | Carrier core link down | Staged | not measured (at most about 15 sec) |
 | INC-07 | VPN down after a PSK change | Staged | 26 sec |
 | INC-08 | Branch logs silently dropped by an ACL | Staged | about 14 min |
+| INC-09 | Branch LAN unreachable, dashboard all green | Real | about 1 h 16 min |
 
-Some of these taught me more than I planned. In INC-05 and INC-06 the original fault was the quick part. Most of the outage was the recovery failing afterwards, once because a USB adapter came back under a new interface index and once because of a stale IPsec session. INC-07 and INC-08 were both found with TACACS+ accounting, which told me who changed what and when. INC-08 shows the weak spot in the dashboard: when logs stop coming in nothing alerts, and I only found out once the 15 minute heartbeat window ran out.
+Some of these taught me more than I planned. In INC-05 and INC-06 the original fault was the quick part. Most of the outage was the recovery failing afterwards, once because a USB adapter came back under a new interface index and once because of a stale IPsec session. INC-07 and INC-08 were both found with TACACS+ accounting, which told me who changed what and when. INC-08 shows the weak spot in the dashboard: when logs stop coming in nothing alerts, and I only found out once the 15 minute heartbeat window ran out. INC-09 is the opposite problem: the logs kept coming and the branch LAN was unreachable for over an hour, and only a failed backup run caught it.
 
 ## Things I learned
 
@@ -174,6 +175,7 @@ Some of these taught me more than I planned. In INC-05 and INC-06 the original f
 - **802.1X demo.** freeradius is running but I haven't tested Fa0/20 on the 2950 with a supplicant yet. Both USB adapters are in use, so it'll have to be the MacBook.
 - **Promtail positions file.** It should be bind mounted so a container recreate doesn't resend everything.
 - **Alerting.** Grafana alerts on EIGRP neighbor down and on log silence per host, instead of watching the dashboard.
+- **Reachability checks.** A ping or IP SLA probe to each site's LAN, since a green heartbeat only proves the router can send (INC-09).
 - **Scheduled backups.** Run backup.py from cron and alert when the diff isn't empty.
 - **Config change logging.** `archive` with `log config` and `notify syslog` so config changes show up in Loki as well as in TACACS+ accounting.
 - **tacacs-node timestamps.** Fix the timezone on the container's log lines.

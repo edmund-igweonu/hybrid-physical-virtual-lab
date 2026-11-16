@@ -244,3 +244,70 @@ Lessons
 - detection by absence is only as fast as the window. INC-07 got caught in 26
   sec, this one took about 14 min, and everything else looked healthy the whole
   time
+
+## INC-09 Branch LAN unreachable, dashboard all green
+
+This one wasn't staged. The SG105E at the branch was unplugged when 881-R2
+booted, and nothing on the dashboard noticed.
+
+Timeline
+- about 10:54  881-R2 boots with the SG105E unplugged (from show version
+  uptime). FE0 is the only port carrying VLAN 1, so FE0 and Vlan1 stay down
+  and 10.20.50.0/24 never goes into EIGRP. There's no FE0 down message
+  because the port never came up after the boot
+- 11:11:50 onward  881-R2 heartbeats reach the Acer every 5 min with no gaps.
+  Tunnel up, EIGRP neighbor up, heartbeat tile green
+- about 12:10  backup.py gets 5 of 6. 881-R2 fails with a TCP timeout to
+  10.20.50.1:22 (folder 2026-11-16_1210Z)
+- from the Acer: ping to 172.16.100.2 (the branch tunnel address) works, ping
+  and SSH to 10.20.50.1 get "No route to host" back from 881-R1. Tunnel is
+  fine, HQ just has no route to the branch LAN
+- 881-R1: EIGRP neighbor 172.16.100.2 up for 01:22:04 and listed as a routing
+  information source, but no route for the branch LAN:
+
+```
+881-R1#show ip route 10.20.50.0
+% Subnet not in table
+```
+
+- last backup with 881-R2 in it (2026-11-14_0935) still has network
+  10.20.50.0 0.0.0.255 under router eigrp 18, so the config was fine. That
+  leaves Vlan1 being down on 881-R2
+- found the SG105E unplugged and plugged it back in
+- 12:17:02  881-R2 FE0 up
+- 12:17:34  Vlan1 up, 10.20.50.0/24 back in EIGRP
+- 12:20  backup.py gets 6 of 6 (folder 2026-11-16_1220Z)
+
+Impact: branch LAN unreachable from HQ for about 1 h 23 min. Anything on the
+branch LAN had no path to HQ services. 881-R2 itself stayed reachable on its
+tunnel address the whole time.
+
+Time to detect: about 1 h 16 min, and only because backup.py happened to run.
+Total outage: about 1 h 23 min.
+
+Root cause: SG105E unplugged at the branch. With no other port in VLAN 1,
+881-R2's Vlan1 stayed down, so the branch LAN was never advertised to HQ.
+
+Why the dashboard missed it: every check on the dashboard looks at the tunnel
+or at logs. The tunnel and the EIGRP adjacency were up, and syslog is one way
+UDP from 881-R2 to HQ, so it doesn't need the route back. The branch looked
+healthy from every angle the dashboard has.
+
+Prevention
+- a reachability check to the branch LAN, a ping from the Acer to 10.20.50.1
+  or an IP SLA probe on 881-R1, alerting when it fails
+- check the route table on 881-R1 for 10.20.50.0/24, not just the EIGRP
+  neighbor, after the lab comes up
+
+Lessons
+- a green heartbeat means the router can send, not that anything can reach
+  it. INC-08 was the network fine and the logs gone, this was the logs fine
+  and the network gone
+- an EIGRP neighbor being up doesn't mean the routes you expect are coming
+  over it
+- the only thing that caught this was the backup job, which is a good reason
+  to put it on cron
+
+Screenshots
+
+![Dashboard just after the fix (last hour, NST). Both heartbeats green, no EIGRP neighbor changes, and the only interface events and the one critical event are FE0 and Vlan1 coming back up at 08:47 NST. Nothing on the dashboard ever showed the outage](screenshots/inc09-dashboard.png)
