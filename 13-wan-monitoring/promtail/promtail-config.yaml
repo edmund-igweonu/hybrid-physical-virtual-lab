@@ -43,3 +43,9 @@ scrape_configs:
           job: tacacs
           host: tacacs-node
           __path__: /var/log/remote/10.10.30.244.log
+  - job_name: pihole
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: pihole
+          __path__: /var/log/pihole/pihole.log

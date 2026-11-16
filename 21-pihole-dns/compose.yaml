@@ -1,0 +1,18 @@
+services:
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    network_mode: host
+    environment:
+      FTLCONF_ntp_ipv4_active: "false"
+      FTLCONF_ntp_ipv6_active: "false"
+      FTLCONF_ntp_sync_active: "false"
+      TZ: America/St_Johns
+      FTLCONF_webserver_api_password: ${PIHOLE_PW}
+      FTLCONF_dns_listeningMode: BIND
+      FTLCONF_dns_interface: tailscale0
+      FTLCONF_webserver_port: "8081"
+    volumes:
+      - ./etc-pihole:/etc/pihole
+      - ./logs:/var/log/pihole
+    restart: unless-stopped
