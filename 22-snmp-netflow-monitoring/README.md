@@ -4,23 +4,24 @@
 
 Every lab before this one sent syslog or AAA accounting somewhere, but nothing in the network was being polled or watched for state changes. Most NOCs still run on SNMP polling, SNMP traps and flow data, so this lab adds that layer on top of the lab 20 network.
 
-The physical 881-R1 is monitored three ways:
+Both physical 881s are monitored. 881-R1 (the HQ hub) sits on the same segment as the collector, and 881-R2 (the branch spoke) is polled across the WAN, through DMVPN over the lab 20 MPLS carrier. The monitoring covers:
 
 - SNMPv3 polling (authPriv, SHA + AES-128) into LibreNMS for interface, CPU, memory and uptime graphs
 - SNMPv3 traps for link and config changes, decoded by LibreNMS's snmptrapd container
 - Flexible NetFlow v9 exported to an nfdump collector for top talker analysis
 
-On top of that, LibreNMS alert rules were tested against a real cable pull, with the alert firing and then clearing on its own.
+On top of that, LibreNMS alert rules were tested against a cable pull on the hub and a full WAN outage to the branch, with each alert firing and then clearing on its own. NetFlow is configured on 881-R1 only.
 
 ## Topology
 
 | Role | Device | Address |
 |---|---|---|
-| Monitored router | 881-R1 (C881G+7-A-K9, IOS 15.7(3)M9) | Vlan1 10.10.30.1 |
+| HQ router (DMVPN hub) | 881-R1 (C881G+7-A-K9, IOS 15.7(3)M9) | Vlan1 10.10.30.1 |
+| Branch router (DMVPN spoke) | 881-R2 (C881G+7-A-K9) | 10.20.50.1 |
 | Collector | Acer (Ubuntu 24.04), enp1s0 via the 2950 | 10.10.30.250 |
 | Mgmt switch | Cisco 2950 | Vlan1 10.10.30.10 |
 
-Both the router and the collector sit on the same 10.10.30.0/24 segment through the physical 2950, so polling, traps and flow export all stay on one flat management network.
+881-R1 and the collector sit on the same 10.10.30.0/24 segment through the physical 2950, so polling, traps and flow export for the hub stay on one flat management network. 881-R2 is only reachable from there across the WAN: Acer to 881-R1, then through the DMVPN tunnel over the MPLS carrier (the c2691s in the lab 20 GNS3 project) to the branch. Monitoring the branch this way means a WAN failure shows up in LibreNMS as the branch going down, which is how a real NOC sees a remote site.
 
 ## Collector stack
 
@@ -146,7 +147,7 @@ sudo nfdump -R /var/cache/nfdump -s ip/bytes -n 10
 Over about 15 minutes nfdump processed 114 flows. What showed up:
 
 - **10.10.30.250 and 10.10.30.1** made up about 75% of bytes. This was SNMP polling from LibreNMS plus my SSH session, so on a quiet LAN the monitoring system was the biggest talker.
-- **0.0.0.0 to 255.255.255.255 on UDP 67/68** arrived on FE4, about 15% of bytes. With the lab 20 GNS3 project shut down, the far end of the DMVPN underlay cable was sending DHCP requests, most likely an Acer USB adapter with no IPv4 address.
+- **0.0.0.0 to 255.255.255.255 on UDP 67/68** arrived on FE4, about 15% of bytes. With the lab 20 GNS3 project shut down, the far end of the DMVPN underlay cable was sending DHCP requests. That turned out to be one of the Acer's USB-to-Ethernet adapters, which has no IPv4 address configured.
 - **10.10.20.10 to 239.255.255.250 and 224.0.0.251** was SSDP and mDNS from the Acer's second address on the lab segment. Desktop service discovery was leaking onto the lab LAN from the monitoring host itself.
 - **10.10.30.10**, the 2950's SVI, had a handful of small flows.
 
@@ -154,13 +155,62 @@ Over about 15 minutes nfdump processed 114 flows. What showed up:
 
 I added four rules from LibreNMS's built-in collection: Devices up/down, Port status up/down, Device rebooted, and Processor usage over 85%.
 
-The port rule only fires when a port is operationally down while still admin up, so an admin `shutdown` doesn't trigger it. That's intended, since a shutdown is a deliberate change. To test properly I pulled the FE4 cable on R1.
+The port rule is meant to fire when a port is operationally down while still admin up, so that a deliberate `shutdown` is ignored. To test with a real failure I pulled the FE4 cable on R1. (In phase 2 an admin shutdown of Tunnel0 fired this rule anyway. See finding 7.)
 
 The alert fired at 10:22:11 and recovered at 10:30:39 after the cable went back in:
 
 ![Alert log showing fire and recovery](screenshots/06-alert-log.png)
 
 The alert was raised on Tunnel0 (DMVPN hub). FE4 is the tunnel's underlay, so when the cable came out, the tunnel lost its source interface and its route to the peer, and its line protocol dropped as well. One physical fault showed up as an alert on a logical interface that depends on it, which is the kind of symptom versus root cause tracing a NOC has to do.
+
+## Phase 2: monitoring the branch over the WAN
+
+### Reaching the branch
+
+The Acer needed a route to the branch LAN via 881-R1. I added it to the `enp1s0` NetworkManager profile so it survives reboots:
+
+```
+sudo nmcli connection modify "Wired connection 1" +ipv4.routes "10.20.50.0/24 10.10.30.1"
+sudo nmcli connection up "Wired connection 1"
+```
+
+881-R2 got the same SNMPv3 config as 881-R1, with its trap source set to the interface holding 10.20.50.1. I checked it with `snmpget` against 10.20.50.1 before adding it to LibreNMS.
+
+### A second trap user
+
+881-R2 has its own engine ID, and the LibreNMS container's environment variables only create one trap user. The container generates `/etc/snmp/snmptrapd.conf` at startup by editing it in place, so mounting a replacement over that file would break the startup script. Instead I mounted a second config file, which snmptrapd also reads, holding 881-R2's user:
+
+```
+createUser -e 0x<R2_ENGINE_ID> librenms SHA <AUTH_PASS> AES <PRIV_PASS>
+```
+
+```yaml
+  snmptrapd:
+    volumes:
+      - "./librenms:/data"
+      - "./snmptrapd/extra-users.conf:/usr/share/snmp/snmptrapd.conf:ro"
+```
+
+881-R1 keeps using the user from `librenms.env`. A `conf t` / `end` on each router produced a config change trap from both in the Eventlog, which confirmed both users work.
+
+### Branch outage test
+
+To simulate a WAN failure I shut Tunnel0 on 881-R1 and watched how 881-R2 showed up in LibreNMS:
+
+| Time | Event |
+|---|---|
+| 11:57:09 | linkDown trap from 881-R1 for Tunnel0, 7 seconds after the shutdown |
+| 11:57:09 | Port status alert fires on 881-R1 Tunnel0 |
+| 11:57:26 | 10.20.50.1 marked down by ICMP and SNMP checks, Devices up/down alert fires |
+| 12:00:15 | Tunnel0 restored, linkUp trap, port alert clears |
+| 12:01:49 | 10.20.50.1 marked up again |
+| 12:02:20 | Devices up/down alert for 10.20.50.1 clears |
+
+![Eventlog for the branch outage](screenshots/07-eventlog-branch-outage.png)
+
+![Alert log for the branch outage](screenshots/08-alert-log-branch-outage.png)
+
+The trap was the fastest signal. Marking the branch down depends on polling, and catching it in 17 seconds here was partly timing, since the worst case is a full 5 minute polling cycle. Recovery also lagged: the branch only came back about 1.5 minutes after the tunnel interface was up, because IKEv2 had to renegotiate and the spoke had to register with NHRP again before anything could reach it.
 
 ## Findings and troubleshooting
 
@@ -174,12 +224,15 @@ The alert was raised on Tunnel0 (DMVPN hub). FE4 is the tunnel's underlay, so wh
 
 5. **Monitoring only the WAN interface showed almost nothing.** NetFlow was first applied only to FE4, the DMVPN underlay. With the carrier project in GNS3 shut down, FE4 carried barely any traffic, and when it is up it only carries ESP between the two tunnel endpoints. Adding the monitor to Vlan1 and Tunnel0 gave useful data: Vlan1 shows LAN hosts, and Tunnel0 shows the decrypted traffic inside the VPN.
 
+6. **SNMPv3 traps need one user entry per sending router.** Each router sends traps under its own engine ID, so a single `createUser` line only covers one device. 881-R2's traps were dropped until it had its own entry in the extra config file.
+
+7. **An admin shutdown still fired the port alert.** Shutting Tunnel0 on 881-R1 raised a Port status alert, even though the rule is supposed to skip admin-down ports. The Eventlog recorded the trap as `linkDown up/down Tunnel0`, meaning admin up and oper down, so LibreNMS treated it as an unplanned failure. In practice you'd put the device in maintenance mode in LibreNMS before planned work so this doesn't page anyone.
+
 ## Known gaps and next steps
 
-- **881-R2 isn't monitored yet.** Its only path from the collector runs across the MPLS carrier and DMVPN in the lab 20 GNS3 project. Polling the branch over the WAN is the more realistic setup, since losing the tunnel would then also show up as the branch going down.
-- **Traps from a second router need a custom snmptrapd.conf.** The LibreNMS container's environment variables only support one engine ID, so R2 will need its own `createUser` line in a mounted config file.
+- **NetFlow only runs on 881-R1.** Adding it to 881-R2 would show branch traffic, with the exports crossing the tunnel to the collector.
 - **The 2950 hasn't been added.** Its image has no crypto support, so SNMPv3 authNoPriv is the best it can do.
-- **An HSRP state change alert** would catch failovers where nothing actually goes down. This needs R2 in place.
+- **An HSRP state change alert** would catch failovers where nothing actually goes down. The HSRP traps are enabled on both 881s, but no HSRP failover was tested in this lab.
 - **There's no alert transport yet.** Alerts only show in the web UI. Sending them to a ticketing system by webhook is planned for the next lab.
 - **A Wireshark capture comparing SNMPv2c (community string in plaintext) with SNMPv3** would make the security point clearer.
 
