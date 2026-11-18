@@ -1,0 +1,459 @@
+
+881-R2#ter
+881-R2#terminal m le
+881-R2#terminal length 0
+881-R2#sh run
+Building configuration...
+
+  
+Current configuration : 3736 bytes
+!
+version 15.7
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+!
+hostname 881-R2
+!
+boot-start-marker
+boot-end-marker
+!
+!
+enable secret 5 $1$.PpB$NAW4f0uFZYpqFob7kpCcH1
+!
+aaa new-model
+!
+!
+aaa authentication login default group tacacs+ local
+aaa authorization exec default group tacacs+ local 
+aaa accounting exec default start-stop group tacacs+
+aaa accounting commands 15 default start-stop group tacacs+
+!
+!
+!
+!
+!
+aaa session-id common
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+
+
+!
+!
+!
+!
+no ip domain lookup
+ip domain name lab.local
+ip cef
+no ipv6 cef
+!
+!
+multilink bundle-name authenticated
+chat-script hspa-R7 "" "AT!SCACT=1,1" TIMEOUT 60 "OK"
+license udi pid C881G+7-A-K9 sn FTX183883XT
+!
+!
+username eddy privilege 15 secret 5 $1$3G2o$QjeLFuxRVVzzXkjIdlLJP1
+!
+!
+!
+crypto ikev2 keyring DMVPN-KEYS
+ peer ANY
+  address 0.0.0.0 0.0.0.0
+  pre-shared-key psk
+ !
+!
+!
+crypto ikev2 profile DMVPN-IKEV2
+ match identity remote address 0.0.0.0 
+ authentication remote pre-share
+ authentication local pre-share
+ keyring local DMVPN-KEYS
+ dpd 10 3 on-demand
+!
+!
+!
+controller Cellular 0
+!
+! 
+!
+!
+crypto ipsec transform-set DMVPN-TS esp-aes 256 esp-sha256-hmac 
+ mode transport
+!
+crypto ipsec profile DMVPN-IPSEC
+ set transform-set DMVPN-TS 
+ set ikev2-profile DMVPN-IKEV2
+!
+!
+!
+!
+!
+!
+!
+interface Loopback1
+ description Spoke1 LAN
+ ip address 10.18.1.1 255.255.255.0
+!
+interface Tunnel0
+ description DMVPN spoke 1
+ bandwidth 10000
+ ip address 172.16.100.2 255.255.255.0
+ no ip redirects
+ ip mtu 1400
+ ip nhrp authentication DMVPN18
+ ip nhrp map 172.16.100.1 10.20.1.2
+ ip nhrp map multicast 10.20.1.2
+ ip nhrp network-id 18
+ ip nhrp nhs 172.16.100.1
+ ip tcp adjust-mss 1360
+ tunnel source FastEthernet4
+ tunnel mode gre multipoint
+ tunnel key 18
+ tunnel protection ipsec profile DMVPN-IPSEC
+!
+interface FastEthernet0
+ switchport mode trunk
+ no ip address
+!
+interface FastEthernet1
+ no ip address
+!
+interface FastEthernet2
+ no ip address
+!
+interface FastEthernet3
+ no ip address
+!
+interface FastEthernet4
+ description DMVPN underlay
+ ip address 10.20.2.2 255.255.255.252
+ duplex auto
+ speed auto
+!
+interface Cellular0
+ ip address negotiated
+ encapsulation slip
+ shutdown
+ dialer in-band
+ dialer idle-timeout 0
+ dialer string hspa-R7
+ dialer-group 1
+!
+interface Vlan1
+ ip address 10.20.50.1 255.255.255.0
+!
+!
+router eigrp 18
+ network 10.18.1.0 0.0.0.255
+ network 10.20.50.0 0.0.0.255
+ network 172.16.100.0 0.0.0.255
+ passive-interface Vlan1
+ eigrp router-id 2.2.2.2
+!
+ip forward-protocol nd
+no ip http server
+no ip http secure-server
+!
+!
+ip route 10.20.1.0 255.255.255.252 10.20.2.1
+ip tacacs source-interface Vlan1
+ip ssh version 2
+!
+ip access-list standard SNMP-MGMT
+ permit 10.10.30.250
+!
+logging source-interface Vlan1
+logging host 10.10.30.250
+dialer-list 1 protocol ip permit
+dialer-list 1 protocol ipv6 permit
+ipv6 ioam timestamp
+!
+snmp-server group NOC-RO v3 priv read ALLVIEW access SNMP-MGMT
+snmp-server view ALLVIEW iso included
+snmp-server ifindex persist
+snmp-server trap-source Vlan1
+snmp-server location HomeLab-Branch
+snmp-server contact Eddy 
+snmp-server enable traps snmp linkdown linkup coldstart
+snmp-server enable traps config
+snmp-server enable traps hsrp
+snmp-server host 10.10.30.250 version 3 priv librenms 
+tacacs server TAC1
+ address ipv4 10.10.30.244
+ key 7 120D0004060202037B7977
+!
+!
+!
+control-plane
+!
+banner motd ^C Eddy's lab - auth access only ^C
+!
+line con 0
+ exec-timeout 30 0
+ logging synchronous
+ no modem enable
+line aux 0
+line 3
+ script dialer hspa-R7
+ no exec
+line vty 0 4
+ exec-timeout 30 0
+ transport input ssh
+!
+ntp server 10.10.30.1
+event manager applet NOC-HEARTBEAT
+ event timer watchdog time 300
+ action 1.0 syslog msg "NOC heartbeat"
+!
+end
+
+881-R2#show vlan br
+% Ambiguous command:  "show vlan br"
+881-R2#show vlan br
+% Ambiguous command:  "show vlan br"
+881-R2#show vlan breif
+                   ^
+% Invalid input detected at '^' marker.
+
+881-R2#show vlan breif   ief
+% Ambiguous command:  "show vlan brief"
+881-R2#show vlan brief ?
+% Ambiguous command:  "show vlan brief "
+881-R2#show vlan brief                 
+*Feb  6 06:34:27.135: %HA_EM-6-LOG: NOC-HEARTBEAT: NOC heartbeat
+881-R2#cd ~/old-configs
+%Error in getting status for flash:/~/old-configs (File not found)
+881-R2#rm 2950.txt
+Remove directory filename [2950.txt]? 
+Delete flash:/2950.txt? [confirm]c
+881-R2#screen -L -Logfile 881-r2.txt /dev/ttyUSB0 9600
+        ^
+% Invalid input detected at '^' marker.
+
+881-R2#screen -L -Logfile 881-r2.txt /dev/ttyUSB0 9600
+        ^
+% Invalid input detected at '^' marker.
+
+881-R2#conf t
+Enter configuration commands, one per line.  End with CNTL/Z.
+881-R2(config)#screen -L -Logfile 881-r2.txt /dev/ttyUSB0 9600
+                  ^
+% Invalid input detected at '^' marker.
+
+881-R2(config)#end
+881-R2#
+*Feb  6 06:36:20.304: %SYS-5-CONFIG_I: Configured from console by eddy on console
+881-R2#screen -L -Logfile 881-r2.txt /dev/ttyUSB0 9600
+        ^
+% Invalid input detected at '^' marker.
+
+881-R2#cd ~/old-configs
+%Error in getting status for flash:/~/old-configs (File not found)
+881-R2#
+
+User Access Verification
+
+Username: eddy
+Password: 
+
+Switch>en
+Password: 
+Switch#term
+Switch#terminal 
+Switch#terminal l
+Switch#terminal length 0
+Switch#sh run
+Building configuration...
+
+Current configuration : 3267 bytes
+!
+version 12.1
+no service pad
+service timestamps debug uptime
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname Switch
+!
+aaa new-model
+aaa authentication login default group tacacs+ local
+aaa authentication enable default enable
+aaa authorization console
+aaa authorization exec default group tacacs+ local
+aaa accounting exec default start-stop group tacacs+
+aaa accounting commands 1 default start-stop group tacacs+
+aaa accounting commands 15 default start-stop group tacacs+
+enable secret 5 $1$2kc3$iBcO1U6i9oNWEbHOK656k0
+!
+username eddy secret 5 $1$dxEm$Zlz3SKQXaS6Qt1CtItVm.1
+ip subnet-zero
+!
+ip dhcp snooping vlan 1
+ip dhcp snooping
+!
+spanning-tree mode pvst
+no spanning-tree optimize bpdu transmission
+spanning-tree extend system-id
+!
+!
+!
+!
+interface Port-channel1
+ switchport access vlan 10
+ switchport mode access
+ flowcontrol send off
+!
+interface FastEthernet0/1
+ switchport trunk allowed vlan 1,10,20,30,40,50,60
+ switchport mode trunk
+!
+interface FastEthernet0/2
+ switchport mode access
+ channel-group 1 mode on
+!
+interface FastEthernet0/3
+ switchport access vlan 60
+ switchport mode trunk
+!
+interface FastEthernet0/4
+ switchport access vlan 60
+!
+interface FastEthernet0/5
+ switchport access vlan 50
+ switchport mode access
+!
+interface FastEthernet0/6
+ switchport access vlan 50
+ switchport mode access
+!
+interface FastEthernet0/7
+ switchport access vlan 50
+ switchport mode access
+!
+interface FastEthernet0/8
+!
+interface FastEthernet0/9
+ switchport access vlan 40
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/10
+ spanning-tree portfast
+!
+interface FastEthernet0/11
+ description DMVPN underlay
+ switchport access vlan 100
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/12
+ description DMVPN underlay
+ switchport access vlan 100
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/13
+ description DMVPN underlay
+ switchport access vlan 100
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/14
+!
+interface FastEthernet0/15
+!
+interface FastEthernet0/16
+!
+interface FastEthernet0/17
+ switchport access vlan 60
+ switchport mode access
+ ip dhcp snooping trust
+!
+interface FastEthernet0/18
+ switchport access vlan 60
+ switchport mode access
+ ip dhcp snooping limit rate 10
+!
+interface FastEthernet0/19
+ switchport mode access
+ switchport port-security
+ switchport port-security violation restrict
+ switchport port-security mac-address sticky
+ switchport port-security mac-address sticky 9c69.d392.e20c
+!
+interface FastEthernet0/20
+!
+interface FastEthernet0/21
+!
+interface FastEthernet0/22
+!
+interface FastEthernet0/23
+ switchport trunk allowed vlan 1,50
+ switchport mode trunk
+!
+interface FastEthernet0/24
+ switchport trunk allowed vlan 1,10,20,50
+ switchport mode trunk
+!
+interface Vlan1
+ ip address 10.10.30.10 255.255.255.0
+ no ip route-cache
+!
+ip default-gateway 10.10.30.1
+ip http server
+logging facility local0
+logging 10.10.30.241
+logging 10.10.30.250
+tacacs-server host 10.10.30.244
+tacacs-server key testing123
+!
+line con 0
+line vty 0 4
+ password Pass4ubuntu!
+line vty 5 15
+!
+ntp clock-period 17180154
+ntp server 10.10.30.1
+!
+!
+monitor session 1 source interface Fa0/12
+monitor session 1 destination interface Fa0/10
+end
+
+Switch#sh vlan br
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Fa0/2, Fa0/8, Fa0/10, Fa0/14
+                                                Fa0/15, Fa0/16, Fa0/19, Fa0/20
+                                                Fa0/21, Fa0/22, Fa0/24
+10   USERS                            active    
+20   SERVERS                          active    
+30   BRANCH                           active    
+40   LOG-MONITORING                   active    Fa0/9
+50   VRRP-LAB                         active    Fa0/5, Fa0/6, Fa0/7
+60   VLAN0060                         active    Fa0/3, Fa0/4, Fa0/17, Fa0/18
+100  DMVPN-INTERNET                   active    Fa0/11, Fa0/12, Fa0/13
+1002 fddi-default                     act/unsup 
+1003 token-ring-default               act/unsup 
+1004 fddinet-default                  act/unsup 
+1005 trnet-default                    act/unsup 
+Switch#
+Switch#

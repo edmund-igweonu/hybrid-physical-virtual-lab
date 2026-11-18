@@ -1,0 +1,266 @@
+ Eddy's lab - auth access only 
+
+User Access Verification
+
+Username: eddy
+Password: 
+
+881-R1>en
+Password: 
+881-R1#term
+881-R1#terminal l
+881-R1#terminal length 0
+881-R1#sh run 
+Building configuration...
+
+Current configuration : 4541 bytes
+!
+version 15.7
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+!
+hostname 881-R1
+!
+boot-start-marker
+boot-end-marker
+!
+!
+enable secret 5 $1$XceR$3/cXAl6Om9BMRhFiDZXDz/
+!
+aaa new-model
+!
+!
+aaa authentication login default group tacacs+ local
+aaa authorization exec default group tacacs+ local 
+aaa accounting exec default start-stop group tacacs+
+aaa accounting commands 15 default start-stop group tacacs+
+!
+!
+!
+!
+!
+aaa session-id common
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+
+
+!
+!
+!
+!
+no ip domain lookup
+ip domain name lab.local
+ip cef
+no ipv6 cef
+!
+!
+flow exporter EXP-ACER
+ destination 10.10.30.250
+ source Vlan1
+ transport udp 2055
+!
+!
+flow monitor MON-FNF
+ exporter EXP-ACER
+ cache timeout active 60
+ record netflow ipv4 original-input
+!
+!
+multilink bundle-name authenticated
+chat-script hspa-R7 "" "AT!SCACT=1,1" TIMEOUT 60 "OK"
+license udi pid C881G+7-A-K9 sn FTX183883XQ
+!
+!
+username eddy privilege 15 secret 5 $1$7spG$OKEFvQBkU9yTiWGGJJ5Yw0
+!
+!
+!
+crypto ikev2 keyring DMVPN-KEYS
+ peer ANY
+  address 0.0.0.0 0.0.0.0
+  pre-shared-key psk
+ !
+!
+!
+crypto ikev2 profile DMVPN-IKEV2
+ match identity remote address 0.0.0.0 
+ authentication remote pre-share
+ authentication local pre-share
+ keyring local DMVPN-KEYS
+ dpd 10 3 on-demand
+!
+!
+!
+controller Cellular 0
+!
+track 10 ip sla 10 reachability
+ delay down 30 up 10
+!
+! 
+!
+!
+crypto ipsec transform-set DMVPN-TS esp-aes 256 esp-sha256-hmac 
+ mode transport
+!
+crypto ipsec profile DMVPN-IPSEC
+ set transform-set DMVPN-TS 
+ set ikev2-profile DMVPN-IKEV2
+!
+!
+!
+!
+!
+!
+!
+interface Loopback0
+ no ip address
+!
+interface Loopback1
+ description Hub LAN
+ ip address 10.18.0.1 255.255.255.0
+!
+interface Tunnel0
+ description DMVPN hub
+ bandwidth 10000
+ ip address 172.16.100.1 255.255.255.0
+ no ip redirects
+ ip mtu 1400
+ no ip split-horizon eigrp 18
+ ip flow monitor MON-FNF input
+ ip nhrp authentication DMVPN18
+ ip nhrp network-id 18
+ ip tcp adjust-mss 1360
+ tunnel source FastEthernet4
+ tunnel mode gre multipoint
+ tunnel key 18
+ tunnel protection ipsec profile DMVPN-IPSEC
+!
+interface FastEthernet0
+ switchport trunk allowed vlan 1,50,1002-1005
+ switchport mode trunk
+ no ip address
+!
+interface FastEthernet1
+ no ip address
+!
+interface FastEthernet2
+ no ip address
+!
+interface FastEthernet3
+ no ip address
+!
+interface FastEthernet4
+ description DMVPN underlay 
+ ip address 10.20.1.2 255.255.255.252
+ ip flow monitor MON-FNF input
+ duplex auto
+ speed auto
+!
+interface Cellular0
+ ip address negotiated
+ encapsulation slip
+ shutdown
+ dialer in-band
+ dialer idle-timeout 0
+ dialer string hspa-R7
+ dialer-group 1
+!
+interface Vlan1
+ ip address 10.10.30.1 255.255.255.0
+ no ip redirects
+ ip flow monitor MON-FNF input
+!
+!
+router eigrp 18
+ network 10.10.30.0 0.0.0.255
+ network 10.10.50.0 0.0.0.255
+ network 10.18.0.0 0.0.0.255
+ network 172.16.100.0 0.0.0.255
+ passive-interface Vlan1
+ eigrp router-id 1.1.1.1
+!
+ip forward-protocol nd
+no ip http server
+no ip http secure-server
+!
+!
+ip route 10.20.2.0 255.255.255.252 10.20.1.1
+ip tacacs source-interface Vlan1
+ip ssh version 2
+!
+ip access-list standard SNMP-MGMT
+ permit 10.10.30.250
+!
+ip sla 10
+ icmp-echo 10.20.50.1 source-interface Vlan1
+ frequency 10
+ip sla schedule 10 life forever start-time now
+logging source-interface Vlan1
+logging host 10.10.30.250
+dialer-list 1 protocol ip permit
+dialer-list 1 protocol ipv6 permit
+ipv6 ioam timestamp
+!
+snmp-server group NOC-RO v3 priv read ALLVIEW access SNMP-MGMT
+snmp-server view ALLVIEW iso included
+snmp-server ifindex persist
+snmp-server trap-source Vlan1
+snmp-server location HomeLab
+snmp-server contact Eddy
+snmp-server enable traps snmp linkdown linkup coldstart
+snmp-server enable traps config
+snmp-server enable traps hsrp
+snmp-server host 10.10.30.250 version 3 priv librenms 
+tacacs server TAC1
+ address ipv4 10.10.30.244
+ key 7 00101615105205015E731F
+!
+!
+!
+control-plane
+!
+banner motd ^C Eddy's lab - auth access only ^C
+!
+line con 0
+ exec-timeout 30 0
+ logging synchronous
+ no modem enable
+line aux 0
+line 3
+ script dialer hspa-R7
+ no exec
+line vty 0 4
+ exec-timeout 30 0
+ transport input ssh
+!
+ntp server 10.10.30.250
+event manager applet NOC-HEARTBEAT
+ event timer watchdog time 300
+ action 1.0 syslog msg "NOC heartbeat"
+event manager applet BRANCH-LAN-DOWN
+ event track 10 state down
+ action 1.0 syslog priority errors msg "NOC: branch LAN 10.20.50.1 unreachable from HQ"
+event manager applet BRANCH-LAN-UP
+ event track 10 state up
+ action 1.0 syslog priority errors msg "NOC: branch LAN 10.20.50.1 reachable again"
+!
+end
+
+881-R1#
